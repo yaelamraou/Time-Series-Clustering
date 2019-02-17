@@ -9,6 +9,7 @@ class Data_point():
     def __init__(self,Id,timeSerie,distances) :
         self.visited = 0
         self.Id = Id
+        self.clust_id = None
         self.timeSerie = timeSerie
         self.distances = sorted(distances, key = lambda neigh : neigh.distance)
         #self.isCorePt = False
@@ -18,7 +19,7 @@ class Data_point():
     def inRangeNeigh(self , eps , min_pts ) :
         cpt = 1
         for elem in self.distances :
-            if (elem.distance < eps) :
+            if (elem.distance <= eps) :
                 self.inRange.append(elem)
                 cpt += 1
             else :
@@ -30,6 +31,7 @@ class DbCluster() :
         self.id = id
         self.Cseries = []
     def addSerie(self , Data_point ) :
+        Data_point.clust_id = self.id
         self.Cseries.append(Data_point.timeSerie)
     
 #add id in dist list
@@ -60,17 +62,28 @@ class TimeSerieDbScan() :
             self.DataSet.append(Data_point(id,series[id],elem))
             id += 1
 
+    
     def expand_cluster(self,point,clust):
         clust.addSerie(point)
         point.label = 'Clustered'
-
-        for p in point.inRange :
+        i = 0 
+        condition = i < len(point.inRange)
+        while condition :
+            if point.Id == 3:
+                print( 'i = '  + str(i))
+            p = point.inRange[i]
             if self.DataSet[p.Id].visited == False :
+                
                 self.DataSet[p.Id].visited = True
-                if self.DataSet[p.Id].inRangeNeigh(eps,min_pts) >= min_pts :
+                if self.DataSet[p.Id].inRangeNeigh(eps,min_pts) >= min_pts : 
                     point.inRange = point.inRange + self.DataSet[p.Id].inRange
-                if self.DataSet[p.Id].label != 'Clustered' : 
                     clust.addSerie(self.DataSet[p.Id])
+            else :
+                if self.DataSet[p.Id].label == 'Noise' :
+                    self.DataSet[p.Id].label = 'Clustered'
+                    clust.addSerie(self.DataSet[p.Id])
+            i += 1
+            condition = i < len(point.inRange)
 
     def fit(self,series) :
         self.BuildDistances()
@@ -81,9 +94,7 @@ class TimeSerieDbScan() :
                 p.visited = True
                 if p.inRangeNeigh(eps,min_pts) < min_pts :
                     p.label = 'Noise'
-                    print("Noise")
                 else :
-                    print("create new cluster")
                     newClust = DbCluster(clustID)
                     self.expand_cluster(p,newClust)
                     self.clusters.append(newClust)
@@ -93,29 +104,29 @@ class TimeSerieDbScan() :
                 self.Noise.append(self.DataSet[p.Id])
         
 
+def log(show, data):
+        if show:
+            print(data)
 
 series = np.genfromtxt("series_trace.csv",delimiter=",")
 DistMatrix = np.genfromtxt("dist_matrix_trace.csv",delimiter=",")
 eps = 5
-min_pts = 12
+min_pts = 8
 model = TimeSerieDbScan(DistMatrix,eps,min_pts)
 model.fit(series)
-print(len(model.clusters))
-print(len(model.Noise))
-#for yi in range (0,len(model.clusters)):
-for i in range (0,39):
-    plt.plot(model.DataSet[i].timeSerie)
-    plt.show()
-for ss in model.clusters :
-    print(len(ss.Cseries))
-    for s in ss.Cseries :
-        plt.plot(s)
-    plt.show()
+for yi in range (0,len(model.clusters)):
+    for ss in model.clusters :
+        print(len(ss.Cseries))
+        for s in ss.Cseries :
+            plt.plot(s)
+        plt.show()
 
 
-'''for elem in model.DataSet : 
-    print("##################")
-    for el in elem.inRange :
-        print (el.Id)
-#for elem in model.clusters :
-    #print(elem.Cseries)'''
+# for elem in model.DataSet : 
+#     print('======================')
+#     print(elem.Id)
+#     print("##################")
+#     for el in elem.inRange :
+#         print (el.Id)
+# for elem in model.clusters :
+#     #print(elem.Cseries)'''
